@@ -1,0 +1,10 @@
+TimeoutError: page.waitForNavigation: Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "networkidle"
+============================================================
+page.waitForNavigation: Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "networkidle"
+============================================================
+    at getMarks (D:\aditya_university\backend\src\services\acetMarks.service.js:21:18)
+    at async acetMarks (D:\aditya_university\backend\src\controllers\acet.controller.js:34:24)
