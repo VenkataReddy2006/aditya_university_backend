@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema({
         type: Object,
         default: {}
     },
+    attendanceHistory: {
+        type: Object,
+        default: {}
+    },
     marks: {
         type: Object,
         default: {}

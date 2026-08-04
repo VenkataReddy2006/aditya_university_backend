@@ -6,7 +6,8 @@ const {
     attendance,
     todayAttendance,
     semesters,
-    marks
+    marks,
+    image
 } = require("./acet.controller");
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.post("/attendance", attendance);
 router.post("/today-attendance", todayAttendance);
 router.post("/marks/semesters", semesters);
 router.post("/marks", marks);
+router.get("/image/:rollNo", image);
 
 module.exports = router;

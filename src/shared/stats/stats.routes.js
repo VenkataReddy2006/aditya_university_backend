@@ -1,51 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const Stats = require('../models/Stats');
+const User = require('../models/User');
 
-// Helper to get or create stats document
-async function getStatsDoc() {
-    let stats = await Stats.findOne();
-    if (!stats) {
-        stats = new Stats({ total: 0, aec: 0, acet: 0, aus: 0 });
-        await stats.save();
-    }
-    return stats;
-}
-
-// GET /api/stats - get all stats
+// GET /api/stats - get all stats based on actual users in MongoDB
 router.get('/', async (req, res) => {
     try {
-        const stats = await getStatsDoc();
-        res.json(stats);
+        const aec = await User.countDocuments({ college: 'AEC' });
+        const acet = await User.countDocuments({ college: 'ACET' });
+        const aus = await User.countDocuments({ college: 'AUS' });
+        const total = aec + acet + aus;
+        
+        res.json({ total, aec, acet, aus });
     } catch (error) {
         console.error("Error fetching stats:", error);
         res.status(500).json({ error: "Failed to fetch stats" });
     }
 });
 
-// POST /api/stats/increment - increment login count for a college
+// POST /api/stats/increment - deprecated since we now count real users
 router.post('/increment', async (req, res) => {
-    try {
-        const { college } = req.body;
-        if (!college) {
-            return res.status(400).json({ error: "College is required" });
-        }
-        
-        const collegeLower = college.toLowerCase();
-        if (!['aec', 'acet', 'aus'].includes(collegeLower)) {
-            return res.status(400).json({ error: "Invalid college" });
-        }
-
-        const stats = await getStatsDoc();
-        stats.total += 1;
-        stats[collegeLower] += 1;
-        await stats.save();
-
-        res.json(stats);
-    } catch (error) {
-        console.error("Error incrementing stats:", error);
-        res.status(500).json({ error: "Failed to increment stats" });
-    }
+    res.json({ success: true, message: "Increment deprecated, using real user counts" });
 });
 
 module.exports = router;
