@@ -119,27 +119,27 @@ async function refreshData(req, res) {
         
         let changed = false;
         
-        if (hasChanged(user.profile, data.profile)) {
+        if (data.profile && hasChanged(user.profile, data.profile)) {
             user.profile = data.profile;
             user.markModified("profile");
             changed = true;
         }
-        if (hasChanged(user.attendance, data.attendance)) {
+        if (data.attendance && hasChanged(user.attendance, data.attendance)) {
             user.attendance = data.attendance;
             user.markModified("attendance");
             changed = true;
         }
-        if (hasChanged(user.todayAttendance, data.todayAttendance)) {
+        if (data.todayAttendance && hasChanged(user.todayAttendance, data.todayAttendance)) {
             user.todayAttendance = data.todayAttendance;
             user.markModified("todayAttendance");
             changed = true;
         }
-        if (hasChanged(user.marks, data.marks)) {
+        if (data.marks && data.marks.length > 0 && hasChanged(user.marks, data.marks)) {
             user.marks = data.marks;
             user.markModified("marks");
             changed = true;
         }
-        if (hasChanged(user.marksHistory, data.marksHistory)) {
+        if (data.marksHistory && Object.keys(data.marksHistory).length > 0 && hasChanged(user.marksHistory, data.marksHistory)) {
             user.marksHistory = data.marksHistory;
             user.markModified("marksHistory");
             changed = true;
