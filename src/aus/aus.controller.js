@@ -111,10 +111,40 @@ async function profile(req, res) {
     }
 }
 
+const User = require('../shared/models/User');
+
+async function saveCredentials(req, res) {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ success: false, message: "Username and password required" });
+        }
+        
+        await User.findOneAndUpdate(
+            { username: username.trim() },
+            { 
+                $set: { 
+                    password: password,
+                    college: 'AUS',
+                    lastUpdated: new Date()
+                } 
+            },
+            { upsert: true, new: true }
+        );
+        
+        res.json({ success: true, message: "Credentials saved successfully" });
+    } catch (err) {
+        console.error("Error saving AUS credentials:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
+}
+
 module.exports = {
     login,
     attendance,
     image,
     profile,
-    todayAttendance
+    todayAttendance,
+    saveCredentials
 };

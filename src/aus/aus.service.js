@@ -19,7 +19,7 @@ async function loginStudent(username, password) {
             userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         });
         const page = await context.newPage();
-        await page.goto(LOGIN_URL, { waitUntil: "networkidle" });
+        await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded" });
         await page.fill("#txtUserId", username);
         await page.fill("#txtPassword", password);
         for (let i = 0; i < 5; i++) {
@@ -28,7 +28,7 @@ async function loginStudent(username, password) {
             if (token) break;
         }
         await Promise.all([
-            page.waitForNavigation({ waitUntil: "networkidle", timeout: 15000 }).catch(() => {}),
+            page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => {}),
             page.click("#btnLogin")
         ]);
         if (page.url().toLowerCase().includes("default.aspx")) {
@@ -49,9 +49,13 @@ async function loginStudent(username, password) {
 function loginWithCookie(cookieString, userAgent) {
     const jar = new CookieJar();
     const cookies = cookieString.split(';');
+    let authToken = "";
     for (let c of cookies) {
         if (c.trim()) {
             jar.setCookieSync(c.trim(), "https://info.aec.edu.in");
+            if (c.trim().startsWith("AuthToken=")) {
+                authToken = c.trim().substring("AuthToken=".length);
+            }
         }
     }
     const client = wrapper(axios.create({ 
@@ -63,6 +67,7 @@ function loginWithCookie(cookieString, userAgent) {
             "User-Agent": userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
     }));
+    client.authToken = authToken;
     return { success: true, client };
 }
 
@@ -74,29 +79,16 @@ async function getAttendance(username, password, fromDate = "", toDate = "", coo
         client = login.client;
     }
 
-    const pageRes = await client.get("https://info.aec.edu.in/aus/StudentAttendanceDetails.aspx");
-    const match = pageRes.data.match(/ajax\/StudentAttendanceDetails,App_Web_studentattendancedetails[^"']+/i);
-    let ATTENDANCE_URL = "https://info.aec.edu.in/aus/ajax/StudentAttendanceDetails,App_Web_studentattendancedetails.aspx.a2a1b31c.ashx?_method=GetStudentAttendanceSemwisedetails&_session=rw";
-    if (match) {
-        ATTENDANCE_URL = "https://info.aec.edu.in/aus/" + match[0] + "?_method=GetStudentAttendanceSemwisedetails&_session=rw";
-    }
+    const ATTENDANCE_URL = "https://info.aec.edu.in/aus/Academics/StudentAttendance.aspx?scrid=3&showtype=SA";
 
-    const response = await client.post(
-        ATTENDANCE_URL,
-        {
-            fromDate: fromDate,
-            toDate: toDate,
-            excludeothersubjects: false
-        },
-        {
-            headers: {
-                "Content-Type": "application/json; charset=UTF-8"
-            }
+    const response = await client.get(ATTENDANCE_URL, {
+        headers: {
+            "User-Agent": client.defaults.headers["User-Agent"] || "Mozilla/5.0"
         }
-    );
+    });
 
-    const html = response.data.d;
-    if (!html) {
+    const html = response.data;
+    if (!html || typeof html !== 'string') {
         return {
             success: false,
             message: "Failed to parse attendance data from server."
@@ -147,29 +139,15 @@ async function getProfile(username, password, cookieClient = null) {
         client = login.client;
     }
 
-    // FIRST: fetch StudentProfile.aspx to get the correct AjaxPro hash
-    const pageRes = await client.get("https://info.aec.edu.in/aus/StudentProfile.aspx");
-    const match = pageRes.data.match(/ajax\/StudentProfile,App_Web_studentprofile[^"']+/i);
-    let PROFILE_URL = "https://info.aec.edu.in/aus/ajax/StudentProfile,App_Web_studentprofile.aspx.a2a1b31c.ashx?_method=ShowStudentProfileNew&_session=rw";
-    if (match) {
-        PROFILE_URL = "https://info.aec.edu.in/aus/" + match[0] + "?_method=ShowStudentProfileNew&_session=rw";
-    }
+    const PROFILE_URL = "https://info.aec.edu.in/aus/Academics/StudentProfile.aspx?scrid=17";
 
-    const response = await client.post(
-        PROFILE_URL,
-        `RollNo="${username}"\r\nisImageDisplay=true`,
-        {
-            headers: {
-                "Content-Type": "text/plain; charset=utf-8",
-                "X-AjaxPro-Method": "ShowStudentProfileNew"
-            }
+    const response = await client.get(PROFILE_URL, {
+        headers: {
+            "User-Agent": client.defaults.headers["User-Agent"] || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-    );
+    });
 
     let html = response.data;
-    if (!html) {
-        return { success: false, message: "Failed to load profile data." };
-    }
     
     // DEBUG: Dump html to a file to see what it actually is
     try {
@@ -177,10 +155,9 @@ async function getProfile(username, password, cookieClient = null) {
         console.log("Dumped aus_profile_debug.html");
     } catch(e) {}
 
-    if (html.startsWith("'") && html.endsWith("'")) {
-        html = html.substring(1, html.length - 1);
+    if (typeof html !== 'string') {
+        return { success: false, message: "Invalid profile response: " + JSON.stringify(html) };
     }
-    html = html.replace(/\\'/g, "'").replace(/\\r\\n/g, "\n");
 
     const $ = cheerio.load(html);
     const bioData = $("#divProfile_BioData");
@@ -277,52 +254,61 @@ async function getMarksHistory(username, password, cookieClient = null) {
         client = login.client;
     }
 
-    const pageRes = await client.get("https://info.aec.edu.in/aus/Academics_StudentMarksReport.aspx");
-    const match = pageRes.data.match(/ajax\/Academics_StudentMarksReport,App_Web_studentmarksreport[^"']+/i);
-    let MARKS_URL = "https://info.aec.edu.in/aus/ajax/Academics_StudentMarksReport,App_Web_studentmarksreport.aspx.a2a1b31c.ashx?_method=ShowMarks&_session=rw";
-    if (match) {
-        MARKS_URL = "https://info.aec.edu.in/aus/" + match[0] + "?_method=ShowMarks&_session=rw";
-    }
+    const MARKS_URL = "https://info.aec.edu.in/aus/Academics/StudentMarksReport.aspx?scrid=15";
 
     try {
-        const response = await client.post(
-            MARKS_URL,
-            "",
-            {
-                headers: {
-                    "Content-Type": "text/plain; charset=utf-8",
-                    "X-AjaxPro-Method": "ShowMarks"
-                }
+        const response = await client.get(MARKS_URL, {
+            headers: {
+                "User-Agent": client.defaults.headers["User-Agent"] || "Mozilla/5.0"
             }
-        );
+        });
         let html = response.data;
-        if (html.startsWith("'") && html.endsWith("'")) {
-            html = html.substring(1, html.length - 1);
+        
+        console.log("MARKS HISTORY RESPONSE LENGTH:", typeof html === 'string' ? html.length : JSON.stringify(html).length);
+        console.log("MARKS HISTORY RESPONSE PREVIEW:", typeof html === 'string' ? html.substring(0, 200) : "not string");
+        
+        try {
+            require('fs').writeFileSync('aus_marks_debug.html', typeof html === 'string' ? html : JSON.stringify(html));
+            console.log("Dumped aus_marks_debug.html");
+        } catch(e) {}
+        
+        if (typeof html !== 'string') {
+            return { success: false, message: "Invalid marks response: " + JSON.stringify(html) };
         }
-        html = html.replace(/\\r\\n/g, "\n").replace(/\\"/g, '"').replace(/\\</g, "<").replace(/\\>/g, ">").replace(/\\'/g, "'");
 
         const $2 = cheerio.load(html);
         let currentSection = null;
         let currentSem = null;
         const result = { externalMarks: [], previousSemAttendance: [], previousSemInternalMarks: [] };
 
-        $2("span.reportHeading2").each((i, span) => {
-            const text = $2(span).text().trim();
-            if (text.includes("Semester")) {
-                const nextTable = $2(span).nextAll("table").first();
-                if (nextTable.length > 0) {
-                    const sem = { semester: text, subjects: [] };
-                    const rows = nextTable.find("tr");
-                    const headers = [];
-                    $2(rows[0]).find("td").each((j, td) => headers.push($2(td).text().trim()));
-                    if (rows.length >= 3) {
-                        const grades = [], credits = [];
-                        $2(rows[1]).find("td").each((j, td) => grades.push($2(td).text().trim()));
-                        $2(rows[2]).find("td").each((j, td) => credits.push($2(td).text().trim()));
-                        for (let k = 1; k < headers.length; k++) {
-                            if (headers[k] && headers[k] !== "SGPA") {
-                                sem.subjects.push({ subject: headers[k], grade: grades[k], credits: credits[k] });
-                            } else if (headers[k] === "SGPA") { sem.sgpa = grades[k]; }
+        // Parse External Marks (Present Marks)
+        $2("table").each((i, table) => {
+            const rows = $2(table).find("tr");
+            if (rows.length < 3) return;
+            
+            const semRow = $2(rows[0]).text().trim();
+            if (semRow.includes("Semester")) {
+                const headRow = $2(rows[1]).text().trim();
+                if (headRow.includes("Course Code")) {
+                    const sem = { semester: semRow, subjects: [] };
+                    
+                    for (let j = 2; j < rows.length; j++) {
+                        const tds = $2(rows[j]).find("td");
+                        if (tds.length >= 7 && $2(tds[0]).attr('colspan') === undefined && $2(tds[0]).text().trim() !== '') {
+                            sem.subjects.push({
+                                subject: $2(tds[2]).text().trim(),
+                                courseCode: $2(tds[1]).text().trim(),
+                                grade: $2(tds[4]).text().trim(),
+                                credits: $2(tds[6]).text().trim(),
+                                points: $2(tds[5]).text().trim(),
+                                result: $2(tds[7]).text().trim()
+                            });
+                        } else if ($2(tds[0]).text().includes("SGPA")) {
+                            const summaryText = $2(tds[0]).text();
+                            const sgpaMatch = summaryText.match(/SGPA:\s*([\d.]+)/);
+                            if (sgpaMatch) {
+                                sem.sgpa = sgpaMatch[1];
+                            }
                         }
                     }
                     result.externalMarks.push(sem);
@@ -330,6 +316,7 @@ async function getMarksHistory(username, password, cookieClient = null) {
             }
         });
 
+        // Parse Internal Marks and Attendance
         $2("tr").each((i, tr) => {
             const text = $2(tr).text().trim().replace(/\s+/g, " ");
             if (text === "PREVIOUS SEMESTERS ATTENDANCE") { currentSection = "PREVIOUS SEMESTERS ATTENDANCE"; return; }
@@ -370,7 +357,7 @@ async function getMarksHistory(username, password, cookieClient = null) {
                         for (let k = 1; k < headers.length; k++) {
                             if (headers[k]) {
                                 if (!marksData[headers[k]]) marksData[headers[k]] = {};
-                                marksData[headers[k]][rowLabel] = $2(rowTds[k]).text().trim().replace("&nbsp;", "");
+                                marksData[headers[k]][rowLabel] = $2(rowTds[k]).text().trim().replace(/&nbsp;/g, "");
                             }
                         }
                     }

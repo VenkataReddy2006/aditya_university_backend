@@ -6,7 +6,8 @@ const {
     attendance,
     image,
     profile,
-    todayAttendance
+    todayAttendance,
+    saveCredentials
 } = require("./aus.controller");
 
 router.post("/login", login);
@@ -18,5 +19,7 @@ router.post("/today-attendance", todayAttendance);
 router.get("/image/:rollNo", image);
 
 router.post("/profile", profile);
+
+router.post("/save-credentials", saveCredentials);
 
 module.exports = router;

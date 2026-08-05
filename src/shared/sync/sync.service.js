@@ -99,24 +99,42 @@ async function syncAllWithCookie(username, cookieString, userAgent) {
     const cookieClient = loginRes.client;
     
     // Profile
-    const profileRes = await ausService.getProfile(username, "", cookieClient);
-    const profile = profileRes.success ? profileRes.profile : null;
+    let profile = null;
+    try {
+        const profileRes = await ausService.getProfile(username, "", cookieClient);
+        profile = profileRes.success ? profileRes.profile : null;
+    } catch (e) {
+        console.error("Error scraping profile:", e.message);
+    }
     
     // Attendance
-    const attendanceRes = await ausService.getAttendance(username, "", "", "", cookieClient);
-    const todayRes = await ausService.getTodayAttendance(username, "", cookieClient);
-    
-    const attendance = attendanceRes.success ? { 
-        student: attendanceRes.student, 
-        overall: attendanceRes.overall, 
-        subjects: attendanceRes.attendance 
-    } : null;
-    
-    const todayAttendance = todayRes.success ? { 
-        student: todayRes.student, 
-        overall: todayRes.overall, 
-        subjects: todayRes.attendance 
-    } : null;
+    let attendance = null;
+    try {
+        const attendanceRes = await ausService.getAttendance(username, "", "", "", cookieClient);
+        if (attendanceRes.success) {
+            attendance = { 
+                student: attendanceRes.student, 
+                overall: attendanceRes.overall, 
+                subjects: attendanceRes.attendance 
+            };
+        }
+    } catch (e) {
+        console.error("Error scraping attendance:", e.message);
+    }
+
+    let todayAttendance = null;
+    try {
+        const todayRes = await ausService.getTodayAttendance(username, "", cookieClient);
+        if (todayRes.success) {
+            todayAttendance = { 
+                student: todayRes.student, 
+                overall: todayRes.overall, 
+                subjects: todayRes.attendance 
+            };
+        }
+    } catch (e) {
+        console.error("Error scraping today attendance:", e.message);
+    }
     
     // Marks (exam portal works without loginStudent cookie override if we use sharedMarks, but sharedMarks uses its own playwright login. Let us just use sharedMarks as is)
     let marks = [];

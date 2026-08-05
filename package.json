@@ -27,6 +27,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qs": "^6.15.3",
     "socket.io": "^4.8.3",
+    "tesseract.js": "^7.0.0",
     "tough-cookie": "^6.0.2"
   },
   "devDependencies": {

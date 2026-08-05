@@ -57,10 +57,11 @@ async function loginWithCookie(req, res) {
     try {
         const { username, password, cookieString, userAgent } = req.body;
         
+        console.log('RECEIVED COOKIES:', cookieString);
         const data = await syncAllWithCookie(username, cookieString, userAgent);
         
-        if (!data.profile && !data.attendance) {
-            return res.status(401).json({ success: false, message: "Failed to fetch data with cookie" });
+        if (!data.profile && !data.attendance && (!data.marks || data.marks.length === 0) && (!data.marksHistory || Object.keys(data.marksHistory).length === 0)) {
+            return res.status(401).json({ success: false, message: "Failed to fetch any data with cookie" });
         }
         
         const user = await User.findOneAndUpdate(

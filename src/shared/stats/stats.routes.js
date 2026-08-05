@@ -1,25 +1,45 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
+const Stats = require('../models/Stats');
 
-// GET /api/stats - get all stats based on actual users in MongoDB
+// GET /api/stats - get all stats from the stats collection
 router.get('/', async (req, res) => {
     try {
-        const aec = await User.countDocuments({ college: 'AEC' });
-        const acet = await User.countDocuments({ college: 'ACET' });
-        const aus = await User.countDocuments({ college: 'AUS' });
-        const total = aec + acet + aus;
-        
-        res.json({ total, aec, acet, aus });
+        let stats = await Stats.findOne();
+        if (!stats) {
+            stats = new Stats();
+            await stats.save();
+        }
+        res.json({ total: stats.total, aec: stats.aec, acet: stats.acet, aus: stats.aus });
     } catch (error) {
         console.error("Error fetching stats:", error);
         res.status(500).json({ error: "Failed to fetch stats" });
     }
 });
 
-// POST /api/stats/increment - deprecated since we now count real users
+// POST /api/stats/increment
 router.post('/increment', async (req, res) => {
-    res.json({ success: true, message: "Increment deprecated, using real user counts" });
+    try {
+        const { college } = req.body;
+        const validColleges = ['aec', 'acet', 'aus'];
+        
+        let stats = await Stats.findOne();
+        if (!stats) {
+            stats = new Stats();
+        }
+        
+        stats.total += 1;
+        
+        if (college && validColleges.includes(college.toLowerCase())) {
+            stats[college.toLowerCase()] += 1;
+        }
+        
+        await stats.save();
+        res.json({ success: true, stats });
+    } catch (error) {
+        console.error("Error incrementing stats:", error);
+        res.status(500).json({ error: "Failed to increment stats" });
+    }
 });
 
 module.exports = router;
