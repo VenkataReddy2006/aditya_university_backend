@@ -28,17 +28,17 @@ cron.schedule('*/5 * * * *', async () => {
                 
                 let changed = false;
                 
-                if (hasChanged(user.profile, newData.profile)) {
+                if (newData.profile && hasChanged(user.profile, newData.profile)) {
                     user.profile = newData.profile;
                     changed = true;
                 }
                 
-                if (hasChanged(user.attendance, newData.attendance)) {
+                if (newData.attendance && hasChanged(user.attendance, newData.attendance)) {
                     user.attendance = newData.attendance;
                     changed = true;
                 }
                 
-                if (hasChanged(user.todayAttendance, newData.todayAttendance)) {
+                if (newData.todayAttendance && hasChanged(user.todayAttendance, newData.todayAttendance)) {
                     user.todayAttendance = newData.todayAttendance;
                     changed = true;
                 }
@@ -57,8 +57,13 @@ cron.schedule('*/5 * * * *', async () => {
                     user.markModified('attendanceHistory');
                 }
                 
-                if (hasChanged(user.marks, newData.marks)) {
+                if (newData.marks && newData.marks.length > 0 && hasChanged(user.marks, newData.marks)) {
                     user.marks = newData.marks;
+                    changed = true;
+                }
+
+                if (newData.marksHistory && Object.keys(newData.marksHistory).length > 0 && hasChanged(user.marksHistory, newData.marksHistory)) {
+                    user.marksHistory = newData.marksHistory;
                     changed = true;
                 }
                 
@@ -72,6 +77,7 @@ cron.schedule('*/5 * * * *', async () => {
                     user.markModified('attendance');
                     user.markModified('todayAttendance');
                     user.markModified('marks');
+                    user.markModified('marksHistory');
                 }
                 
                 await user.save();
@@ -83,6 +89,7 @@ cron.schedule('*/5 * * * *', async () => {
                         attendance: user.attendance,
                         todayAttendance: user.todayAttendance,
                         marks: user.marks,
+                        marksHistory: user.marksHistory,
                         lastUpdated: user.lastUpdated
                     });
                     console.log(`[Scheduler] Emitted data_updated to room: ${user.username}`);
