@@ -33,8 +33,8 @@ const userSchema = new mongoose.Schema({
         default: {}
     },
     marks: {
-        type: Object,
-        default: {}
+        type: Array,
+        default: []
     },
     marksHistory: {
         type: Object,
