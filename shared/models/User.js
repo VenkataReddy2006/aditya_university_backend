@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema({
         default: []
     },
     marksHistory: {
-        type: Object,
+        type: mongoose.Schema.Types.Mixed,
         default: {}
     },
     lastUpdated: {

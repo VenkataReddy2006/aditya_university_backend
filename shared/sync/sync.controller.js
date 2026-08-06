@@ -15,7 +15,7 @@ async function login(req, res) {
         const existingUser = await User.findOne({ username });
         if (existingUser && existingUser.password === password) {
             if (existingUser.profile && Object.keys(existingUser.profile).length > 0) {
-                // Trigger background refresh (optional, but good for keeping data fresh)
+                // Trigger background refresh — especially important if marks are empty
                 refreshDataBackground(username);
                 return res.json({ success: true, data: existingUser });
             }
@@ -36,11 +36,14 @@ async function login(req, res) {
             {
                 password,
                 college,
-                profile: data.profile,
-                attendance: data.attendance,
-                todayAttendance: data.todayAttendance,
-                marks: data.marks,
-                marksHistory: data.marksHistory,
+                // Only update profile if we got valid data, else keep existing
+                ...(data.profile ? { profile: data.profile } : {}),
+                // Only update attendance if we got valid data
+                ...(data.attendance ? { attendance: data.attendance } : {}),
+                ...(data.todayAttendance ? { todayAttendance: data.todayAttendance } : {}),
+                // Only update marks if we got non-empty marks, else keep existing
+                ...(data.marks && data.marks.length > 0 ? { marks: data.marks } : {}),
+                ...(data.marksHistory && Object.keys(data.marksHistory).length > 0 ? { marksHistory: data.marksHistory } : {}),
                 lastUpdated: new Date()
             },
             { new: true, upsert: true }
@@ -119,27 +122,27 @@ async function refreshData(req, res) {
         
         let changed = false;
         
-        if (data.profile && hasChanged(user.profile, data.profile)) {
+        if (hasChanged(user.profile, data.profile)) {
             user.profile = data.profile;
             user.markModified("profile");
             changed = true;
         }
-        if (data.attendance && hasChanged(user.attendance, data.attendance)) {
+        if (hasChanged(user.attendance, data.attendance)) {
             user.attendance = data.attendance;
             user.markModified("attendance");
             changed = true;
         }
-        if (data.todayAttendance && hasChanged(user.todayAttendance, data.todayAttendance)) {
+        if (hasChanged(user.todayAttendance, data.todayAttendance)) {
             user.todayAttendance = data.todayAttendance;
             user.markModified("todayAttendance");
             changed = true;
         }
-        if (data.marks && data.marks.length > 0 && hasChanged(user.marks, data.marks)) {
+        if (hasChanged(user.marks, data.marks)) {
             user.marks = data.marks;
             user.markModified("marks");
             changed = true;
         }
-        if (data.marksHistory && Object.keys(data.marksHistory).length > 0 && hasChanged(user.marksHistory, data.marksHistory)) {
+        if (hasChanged(user.marksHistory, data.marksHistory)) {
             user.marksHistory = data.marksHistory;
             user.markModified("marksHistory");
             changed = true;
@@ -193,12 +196,14 @@ async function refreshDataBackground(username) {
                 user.markModified("todayAttendance");
                 changed = true;
             }
-            if (hasChanged(user.marks, data.marks)) {
+            // Only update marks if scrape returned non-empty marks
+            if (data.marks && data.marks.length > 0 && hasChanged(user.marks, data.marks)) {
                 user.marks = data.marks;
                 user.markModified("marks");
                 changed = true;
             }
-            if (hasChanged(user.marksHistory, data.marksHistory)) {
+            // Only update marksHistory if scrape returned non-empty history
+            if (data.marksHistory && Object.keys(data.marksHistory).length > 0 && hasChanged(user.marksHistory, data.marksHistory)) {
                 user.marksHistory = data.marksHistory;
                 user.markModified("marksHistory");
                 changed = true;
@@ -212,7 +217,7 @@ async function refreshDataBackground(username) {
                     profile: user.profile,
                     attendance: user.attendance,
                     todayAttendance: user.todayAttendance,
-                    marks: user.marks,
+                    marks: user.marks,         // emit what's stored in DB (not empty scrape result)
                     marksHistory: user.marksHistory,
                     lastUpdated: user.lastUpdated
                 });
